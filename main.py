@@ -20,6 +20,120 @@ from ui.tabs.fan import FanTab
 
 from core.msr import _load_msr
 
+# ─── Windows Remote Mode Monkeypatching ───────────────────────────────────────
+if os.name == 'nt':
+    import subprocess
+    import json
+    import core.sysfs as sysfs
+    import core.msr as msr
+    import core.undervolt as undervolt
+    
+    def remote_run(cmd: str) -> str:
+        try:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            res = subprocess.run(
+                ["ssh", "dnxk@100.115.117.31", cmd],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                startupinfo=startupinfo,
+                timeout=5
+            )
+            return res.stdout
+        except Exception as e:
+            print(f"[REMOTE] SSH execution failed: {e}")
+            return ""
+            
+    def remote_sudo_run(cmd: str):
+        try:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            subprocess.run(
+                ["ssh", "dnxk@100.115.117.31", f"echo 'dnxkipip' | sudo -S {cmd}"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                startupinfo=startupinfo,
+                timeout=5
+            )
+        except Exception as e:
+            print(f"[REMOTE] SSH sudo failed: {e}")
+
+    def remote_load_config() -> dict:
+        print("[REMOTE] Loading config from Pop!_OS...")
+        out = remote_run("cat ~/.config/mousectl/config.json")
+        try:
+            if out.strip():
+                from core.config import DEFAULT_CONFIG
+                data = json.loads(out)
+                cfg = json.loads(json.dumps(DEFAULT_CONFIG))
+                for k, v in data.items():
+                    if isinstance(v, dict) and k in cfg and isinstance(cfg[k], dict):
+                        cfg[k].update(v)
+                    else:
+                        cfg[k] = v
+                return cfg
+        except Exception as e:
+            print(f"[REMOTE] Failed to parse remote config: {e}")
+        from core.config import DEFAULT_CONFIG
+        return json.loads(json.dumps(DEFAULT_CONFIG))
+        
+    def remote_save_config(cfg: dict):
+        print("[REMOTE] Saving config to Pop!_OS...")
+        cfg_str = json.dumps(cfg, indent=2)
+        try:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            p = subprocess.Popen(
+                ["ssh", "dnxk@100.115.117.31", "mkdir -p ~/.config/mousectl/ && cat > ~/.config/mousectl/config.json"],
+                stdin=subprocess.PIPE,
+                text=True,
+                startupinfo=startupinfo
+            )
+            p.communicate(input=cfg_str)
+        except Exception as e:
+            print(f"[REMOTE] Failed to save config: {e}")
+
+    # Patch loading/saving functions globally
+    global load_config, save_config
+    load_config = remote_load_config
+    save_config = remote_save_config
+
+    # Mock hardware initialization
+    msr._load_msr = lambda: None
+    _load_msr = lambda: None
+
+    # Redirect hardware modifications over SSH
+    sysfs.set_power_profile = lambda p: remote_sudo_run(f"python3 -c \"import sys; sys.path.append('/opt/mousectl'); import core.sysfs as s; s.set_power_profile('{p}')\"") or True
+    sysfs.set_tdp = lambda l, s: remote_sudo_run(f"python3 -c \"import sys; sys.path.append('/opt/mousectl'); import core.sysfs as s; s.set_tdp({l}, {s})\"") or True
+    sysfs.set_fan_auto = lambda: remote_sudo_run("python3 -c \"import sys; sys.path.append('/opt/mousectl'); import core.sysfs as s; s.set_fan_auto()\"") or True
+    sysfs.set_fan_speed = lambda speed: remote_sudo_run(f"python3 -c \"import sys; sys.path.append('/opt/mousectl'); import core.sysfs as s; s.set_fan_speed({speed})\"") or True
+    
+    msr.set_turbo_boost = lambda val: remote_sudo_run(f"python3 -c \"import sys; sys.path.append('/opt/mousectl'); import core.msr as m; m.set_turbo_boost({val})\"") or True
+    msr.set_turbo_ratios = lambda r: remote_sudo_run(f"python3 -c \"import sys; sys.path.append('/opt/mousectl'); import core.msr as m; m.set_turbo_ratios({r})\"") or True
+    
+    undervolt.set_undervolt = lambda plane, val: remote_sudo_run(f"python3 -c \"import sys; sys.path.append('/opt/mousectl'); from core.undervolt import set_undervolt; set_undervolt('{plane}', {val})\"") or True
+
+    def remote_read_undervolt():
+        try:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            res = subprocess.run(
+                ["ssh", "dnxk@100.115.117.31", "python3 -c \"import sys; sys.path.append('/opt/mousectl'); from core.undervolt import read_undervolt; import json; print(json.dumps(read_undervolt()))\""],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                startupinfo=startupinfo,
+                timeout=5
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                return json.loads(res.stdout)
+        except Exception as e:
+            print(f"[REMOTE] Failed to read undervolts: {e}")
+        return {'core': 0.0, 'cache': 0.0, 'gpu': 0.0, 'uncore': 0.0, 'analogio': 0.0}
+            
+    undervolt.read_undervolt = remote_read_undervolt
+
 class MouseCtl(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -84,15 +198,18 @@ class MouseCtl(QMainWindow):
         
         self.tab_dash = DashboardTab(self._cfg)
         self.tab_profiles = ProfilesTab(self._cfg, self._save_cfg, self.apply_custom_profile)
-        self.tab_power = PowerTab(self._cfg, self._save_cfg, self.change_power_profile)
-        self.tab_uv = UndervoltTab(self._cfg, self._save_cfg)
-        self.tab_fan = FanTab(self._cfg, self._save_cfg)
         
         self.tabs.addTab(self.tab_dash, " DASHBOARD ")
         self.tabs.addTab(self.tab_profiles, " PROFILES ")
-        self.tabs.addTab(self.tab_power, " POWER ")
-        self.tabs.addTab(self.tab_uv, " UNDERVOLT ")
-        self.tabs.addTab(self.tab_fan, " FAN CURVE ")
+
+        if os.name != 'nt':
+            self.tab_power = PowerTab(self._cfg, self._save_cfg, self.change_power_profile)
+            self.tab_uv = UndervoltTab(self._cfg, self._save_cfg)
+            self.tab_fan = FanTab(self._cfg, self._save_cfg)
+            
+            self.tabs.addTab(self.tab_power, " POWER ")
+            self.tabs.addTab(self.tab_uv, " UNDERVOLT ")
+            self.tabs.addTab(self.tab_fan, " FAN CURVE ")
         
         self.root.addWidget(self.tabs)
 
@@ -220,8 +337,10 @@ class MouseCtl(QMainWindow):
         self._save_cfg()
         
         # 4. Refresh other tabs
-        self.tab_power.refresh_widgets()
-        self.tab_uv.refresh_widgets()
+        if hasattr(self, 'tab_power'):
+            self.tab_power.refresh_widgets()
+        if hasattr(self, 'tab_uv'):
+            self.tab_uv.refresh_widgets()
         
         return True
 
@@ -272,8 +391,10 @@ class MouseCtl(QMainWindow):
         temp = data.get('temp', 0.0)
         fan = data.get('fan', 0)
         self.tab_dash.update_telemetry(data, temp, fan)
-        self.tab_fan.update_telemetry(data, temp, fan)
-        self.tab_power.update_telemetry(data, temp, fan)
+        if hasattr(self, 'tab_fan'):
+            self.tab_fan.update_telemetry(data, temp, fan)
+        if hasattr(self, 'tab_power'):
+            self.tab_power.update_telemetry(data, temp, fan)
         
         # Update Tray Menu (Details)
         bat    = data.get('battery', {})
@@ -333,6 +454,60 @@ class MouseCtl(QMainWindow):
             event.accept()
 
 def main():
+    if "--telemetry-json" in sys.argv:
+        import json
+        import time
+        from core.telemetry import get_cpu_freq, get_cpu_usage, get_ram_usage, get_igpu_info
+        import core.sysfs as sysfs
+        
+        # CPU usage requires delta, take a quick 100ms sample
+        try:
+            _, t1 = get_cpu_usage([])
+            time.sleep(0.1)
+            usage, _ = get_cpu_usage(t1)
+        except:
+            usage = {'total': 0.0, 'cores': []}
+            
+        try: freqs = get_cpu_freq()
+        except: freqs = []
+        
+        # Instantiate sampler to use its helpers
+        from core.telemetry import PowerSampler
+        try:
+            sampler = PowerSampler()
+            cpu_w = sampler.get_power()
+            bat = sampler.get_battery_info()
+            all_temps = sampler.get_all_temps()
+            rx_speed, tx_speed = sampler.get_net_speed()
+            disk_read, disk_write = sampler.get_disk_speed()
+        except:
+            cpu_w = 0.0
+            bat = {}
+            all_temps = []
+            rx_speed, tx_speed = 0.0, 0.0
+            disk_read, disk_write = 0.0, 0.0
+            
+        data = {
+            'freqs':      freqs,
+            'avg_freq':   sum(freqs) / (len(freqs) or 1),
+            'cpu_w':      cpu_w,
+            'cpu_usage':  usage,
+            'battery':    bat,
+            'fan':        sysfs.get_fan_speed(),
+            'fan_duty':   sysfs.get_fan_duty(),
+            'temp':       sysfs.get_cpu_temp(),
+            'all_temps':  all_temps,
+            'profile':    sysfs.get_power_profile(),
+            'fan_service_active': sysfs.is_fan_service_active(),
+            'tdp':        sysfs.get_tdp(),
+            'ram':        get_ram_usage(),
+            'igpu':       get_igpu_info(),
+            'net_speed':  (rx_speed, tx_speed),
+            'disk_speed': (disk_read, disk_write),
+        }
+        print(json.dumps(data))
+        sys.exit(0)
+
     socket_name = "mousectl_single_instance_lock"
     
     # Try to connect to existing local server

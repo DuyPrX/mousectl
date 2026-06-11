@@ -315,6 +315,30 @@ class PowerSampler(QThread):
         return info
 
     def run(self):
+        import os
+        if os.name == 'nt':
+            import subprocess
+            import json
+            while self.running:
+                try:
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    res = subprocess.run(
+                        ["ssh", "dnxk@100.115.117.31", "/usr/local/bin/mousectl --telemetry-json"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        startupinfo=startupinfo,
+                        timeout=5
+                    )
+                    if res.returncode == 0 and res.stdout.strip():
+                        data = json.loads(res.stdout)
+                        self.data_ready.emit(data)
+                except Exception as e:
+                    print(f"[REMOTE] Sampler error: {e}")
+                self.msleep(int(self.interval * 1000))
+            return
+
         while self.running:
             try:
                 freqs = get_cpu_freq()
