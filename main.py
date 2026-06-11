@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QTabWidget, QLabel, QSystemTrayIcon, QMenu)
 from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QAction, QIcon
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
 # Modular Imports
 from core.config import load_config, save_config
@@ -322,11 +323,47 @@ class MouseCtl(QMainWindow):
             event.accept()
 
 def main():
+    socket_name = "mousectl_single_instance_lock"
+    
+    # Try to connect to existing local server
+    test_socket = QLocalSocket()
+    test_socket.connectToServer(socket_name)
+    if test_socket.waitForConnected(300):
+        # Already running! Send a restore message to the server
+        test_socket.write(b"restore")
+        test_socket.waitForBytesWritten(1000)
+        test_socket.disconnectFromServer()
+        print("[INFO] Another instance is already running. Restored existing window.")
+        return # Exit immediately!
+        
     app = QApplication(sys.argv)
     app.setDesktopFileName("mousectl")
     app.setQuitOnLastWindowClosed(False)
     app.setStyleSheet(SS)
+    
     win = MouseCtl()
+    
+    # Set up single-instance local server
+    QLocalServer.removeServer(socket_name)
+    
+    server = QLocalServer()
+    if server.listen(socket_name):
+        def on_new_connection():
+            client = server.nextPendingConnection()
+            if client:
+                client.readyRead.connect(lambda: handle_client(client, win))
+                
+        def handle_client(client, window):
+            msg = client.readAll().data().decode().strip()
+            if msg == "restore":
+                window.show_window()
+            client.disconnectFromServer()
+            
+        server.newConnection.connect(on_new_connection)
+        win._local_server = server
+    else:
+        print("[WARNING] Could not start local single-instance server:", server.serverError())
+        
     win.show()
     sys.exit(app.exec())
 
