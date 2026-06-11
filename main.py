@@ -460,14 +460,23 @@ def main():
         from core.telemetry import get_cpu_freq, get_cpu_usage, get_ram_usage, get_igpu_info
         import core.sysfs as sysfs
         
-        # CPU usage requires delta, take a quick 100ms sample
+        # CPU usage and CPU power require delta-based measurements.
+        # We take a baseline, sleep for 120ms, and measure the difference.
         try:
             _, t1 = get_cpu_usage([])
-            time.sleep(0.1)
+        except:
+            t1 = []
+            
+        sysfs.get_cpu_power()  # set first raw energy reading in cache
+        time.sleep(0.12)
+        
+        try:
             usage, _ = get_cpu_usage(t1)
         except:
             usage = {'total': 0.0, 'cores': []}
             
+        cpu_w = sysfs.get_cpu_power()  # calculates delta wattage over the sleep interval
+        
         try: freqs = get_cpu_freq()
         except: freqs = []
         
@@ -475,13 +484,11 @@ def main():
         from core.telemetry import PowerSampler
         try:
             sampler = PowerSampler()
-            cpu_w = sampler.get_power()
             bat = sampler.get_battery_info()
             all_temps = sampler.get_all_temps()
             rx_speed, tx_speed = sampler.get_net_speed()
             disk_read, disk_write = sampler.get_disk_speed()
         except:
-            cpu_w = 0.0
             bat = {}
             all_temps = []
             rx_speed, tx_speed = 0.0, 0.0
