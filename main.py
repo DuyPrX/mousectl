@@ -140,14 +140,9 @@ class MouseCtl(QMainWindow):
         self.tray_menu.addSeparator()
 
         # Profiles Submenu
-        self.profile_menu = self.tray_menu.addMenu("Power Profile")
+        self.profile_menu = self.tray_menu.addMenu("Profiles")
         self.prof_actions = {}
-        for p in ["Battery", "Balanced", "Performance"]:
-            act = QAction(p, self)
-            act.setCheckable(True)
-            act.triggered.connect(lambda checked, name=p: self._change_profile_tray(name))
-            self.profile_menu.addAction(act)
-            self.prof_actions[p.lower()] = act
+        self.update_tray_profiles_menu()
 
         self.tray_menu.addSeparator()
         
@@ -230,8 +225,20 @@ class MouseCtl(QMainWindow):
         
         return True
 
-    def _change_profile_tray(self, name):
-        self.change_power_profile(name)
+    def update_tray_profiles_menu(self):
+        self.profile_menu.clear()
+        self.prof_actions = {}
+        
+        profiles = self._cfg.get('profiles', {})
+        active = self._cfg.get('active_profile', 'Balanced (Recommended)')
+        
+        for p in sorted(profiles.keys()):
+            act = QAction(p, self)
+            act.setCheckable(True)
+            act.setChecked(p == active)
+            act.triggered.connect(lambda checked, name=p: self.apply_custom_profile(name))
+            self.profile_menu.addAction(act)
+            self.prof_actions[p] = act
 
     def _on_tray_activated(self, reason):
         # Trigger is single-click, DoubleClick is self-explanatory
@@ -257,6 +264,7 @@ class MouseCtl(QMainWindow):
         """Actual disk write — fires 600ms after the last _save_cfg call."""
         save_config(self._cfg)
         set_status(self.status, 'Config saved', 'ok')
+        self.update_tray_profiles_menu()
 
     @Slot(dict)
     def _on_telemetry(self, data: dict):
@@ -309,10 +317,12 @@ class MouseCtl(QMainWindow):
         disk_r, disk_w = data.get('disk_speed', (0.0, 0.0))
         self.tray_disk.setText(f"💽 Disk: 📖 {format_speed(disk_r)} | ✍ {format_speed(disk_w)}")
         
-        # Sync Profile Checks
-        active_prof = data.get('profile', 'balanced').lower()
+        # Sync Active Profile Check in Tray
+        active_prof = self._cfg.get('active_profile', 'Balanced (Recommended)')
         for p_name, act in self.prof_actions.items():
+            act.blockSignals(True)
             act.setChecked(p_name == active_prof)
+            act.blockSignals(False)
 
     def closeEvent(self, event):
         if not self._quitting:
