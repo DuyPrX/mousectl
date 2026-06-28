@@ -341,12 +341,23 @@ class MouseCtl(QMainWindow):
             self.tab_power.refresh_widgets()
         if hasattr(self, 'tab_uv'):
             self.tab_uv.refresh_widgets()
+        if hasattr(self, 'tab_profiles'):
+            self.tab_profiles.refresh_profile_list()
+            
+        # 5. Immediately update checkmark in tray menu
+        for p_name, act in self.prof_actions.items():
+            act.blockSignals(True)
+            act.setChecked(p_name == name)
+            act.blockSignals(False)
         
         return True
 
     def update_tray_profiles_menu(self):
         self.profile_menu.clear()
         self.prof_actions = {}
+        
+        from PySide6.QtGui import QActionGroup
+        group = QActionGroup(self)
         
         profiles = self._cfg.get('profiles', {})
         active = self._cfg.get('active_profile', 'Balanced (Recommended)')
@@ -355,6 +366,7 @@ class MouseCtl(QMainWindow):
             act = QAction(p, self)
             act.setCheckable(True)
             act.setChecked(p == active)
+            group.addAction(act)
             act.triggered.connect(lambda checked, name=p: self.apply_custom_profile(name))
             self.profile_menu.addAction(act)
             self.prof_actions[p] = act
