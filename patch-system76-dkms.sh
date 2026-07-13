@@ -57,7 +57,14 @@ success "Clean"
 
 # ─── Dependencies ─────────────────────────────────────────────────────────────
 step "Installing dependencies"
-apt-get install -y -qq git dkms build-essential linux-headers-$(uname -r) > /dev/null 2>&1
+
+if dpkg -s git dkms build-essential linux-headers-$(uname -r) >/dev/null 2>&1; then
+    info "Dependencies already installed (dpkg-checked)"
+else
+    # Only run apt-get if any dependency is missing
+    apt-get update -q || true
+    apt-get install -y -qq git dkms build-essential linux-headers-$(uname -r) > /dev/null 2>&1
+fi
 success "Dependencies ready"
 
 # ─── Clone ────────────────────────────────────────────────────────────────────
