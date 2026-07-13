@@ -91,6 +91,8 @@ touch "$INSTALL_DIR/ui/tabs/__init__.py"
 touch "$INSTALL_DIR/scripts/__init__.py"
 
 chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR"
+chmod +x "$INSTALL_DIR/patch-system76-dkms.sh"
+[ -f "$INSTALL_DIR/scripts/autopatch.sh" ] && chmod +x "$INSTALL_DIR/scripts/autopatch.sh"
 success "Files installed and owned by $REAL_USER"
 
 # Main Launcher (V1 Style - no sudo -u which breaks Wayland/Env)
