@@ -75,10 +75,12 @@ mkdir -p "$INSTALL_DIR/ui/tabs"
 mkdir -p "$INSTALL_DIR/scripts"
 
 cp "$SCRIPT_DIR/main.py"            "$INSTALL_DIR/"
+cp "$SCRIPT_DIR/patch-system76-dkms.sh" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/core/"*.py          "$INSTALL_DIR/core/"
 cp "$SCRIPT_DIR/ui/"*.py            "$INSTALL_DIR/ui/"
 cp "$SCRIPT_DIR/ui/tabs/"*.py       "$INSTALL_DIR/ui/tabs/"
 cp "$SCRIPT_DIR/scripts/"*.py       "$INSTALL_DIR/scripts/"
+[ -f "$SCRIPT_DIR/scripts/autopatch.sh" ] && cp "$SCRIPT_DIR/scripts/autopatch.sh" "$INSTALL_DIR/scripts/"
 [ -f "$SCRIPT_DIR/icon.png" ] && cp "$SCRIPT_DIR/icon.png" "$INSTALL_DIR/icon.png"
 
 # Init files
@@ -198,6 +200,11 @@ step "Persistence & Background Services"
 # 5a. Undervolt & Boot Apply
 cat > /usr/local/bin/mousectl-apply-uv << BOOTEOF
 #!/bin/bash
+# Trigger driver auto-patch check on boot
+if [ -f "$INSTALL_DIR/scripts/autopatch.sh" ]; then
+    bash "$INSTALL_DIR/scripts/autopatch.sh"
+fi
+
 export REAL_HOME="$REAL_HOME"
 export HOME="$REAL_HOME"
 python3 $INSTALL_DIR/scripts/apply_boot.py
@@ -243,6 +250,14 @@ systemctl daemon-reload
 systemctl enable mousectl-undervolt.service > /dev/null 2>&1
 systemctl enable mousectl-fan.service > /dev/null 2>&1
 success "Background services enabled"
+
+# 5c. APT Auto-patch hook (survives system updates)
+cat > /etc/apt/apt.conf.d/99-mousectl-autopatch << APTEOF
+DPkg::Post-Invoke {
+    "if [ -f /opt/mousectl/scripts/autopatch.sh ]; then bash /opt/mousectl/scripts/autopatch.sh; fi";
+};
+APTEOF
+success "APT auto-patch hook installed: /etc/apt/apt.conf.d/99-mousectl-autopatch"
 
 # Sleep hook
 cat > /usr/lib/systemd/system-sleep/mousectl-resume << EOF
