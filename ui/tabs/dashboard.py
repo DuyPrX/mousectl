@@ -61,7 +61,7 @@ class DashboardTab(QWidget):
         # Fix #11: CPU Usage graph — the obvious missing fourth graph
         self.graph_usage = TempGraph('CPU USAGE',       '%',    100,  T['green'])
         for g in [self.graph_temp, self.graph_power, self.graph_fan, self.graph_usage]:
-            g.setMinimumHeight(130)
+            g.setMinimumHeight(180)
             graphs_layout.addWidget(g)
         main_layout.addLayout(graphs_layout)
 

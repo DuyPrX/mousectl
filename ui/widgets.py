@@ -76,7 +76,7 @@ class TempGraph(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         w, h  = self.width(), self.height()
-        pad_l, pad_r, pad_t, pad_b = 44, 12, 10, 24
+        pad_l, pad_r, pad_t, pad_b = 44, 12, 30, 15
         iw = w - pad_l - pad_r
         ih = h - pad_t  - pad_b
 
@@ -88,17 +88,17 @@ class TempGraph(QWidget):
         current_max = max(hist) if hist else 0.0
         scale_max = max(self._max_val, current_max) or 1.0
 
-        # Grid lines
+        # Grid lines (including 0.0 baseline)
         pen = QPen(QColor(T['border']))
         pen.setWidth(1)
         p.setPen(pen)
-        for pct in (0.25, 0.5, 0.75, 1.0):
+        for pct in (0.0, 0.25, 0.5, 0.75, 1.0):
             y = pad_t + ih - int(pct * ih)
             p.drawLine(pad_l, y, w - pad_r, y)
             lbl = f'{int(scale_max * pct)}'
             p.setPen(QPen(QColor(T['muted2'])))
             p.setFont(QFont('monospace', 8))
-            p.drawText(0, y + 5, pad_l - 4, 12, Qt.AlignRight, lbl)
+            p.drawText(0, y - 6, pad_l - 6, 12, Qt.AlignRight | Qt.AlignVCenter, lbl)
             p.setPen(pen)
 
         # Data
@@ -132,14 +132,17 @@ class TempGraph(QWidget):
         for i in range(1, len(pts)):
             p.drawLine(pts[i-1], pts[i])
 
-        # Labels
-        p.setPen(QPen(QColor(T['muted2'])))
-        p.setFont(QFont('monospace', 8))
-        p.drawText(pad_l, h - 4, f'{self._label}')
+        # Header Title
+        p.setPen(QPen(QColor(T['text'])))
+        p.setFont(QFont('sans-serif', 8, QFont.Bold))
+        p.drawText(pad_l, 8, iw, 15, Qt.AlignLeft | Qt.AlignVCenter, f'{self._label}')
+
+        # Current Value (Top-right header, in bold)
         cur = hist[-1]
         p.setPen(QPen(QColor(self._color)))
-        p.setFont(QFont('monospace', 9))
-        p.drawText(w - 70, pad_t + 14, f'{cur:.1f}{self._unit}')
+        p.setFont(QFont('monospace', 9, QFont.Bold))
+        cur_text = f'{cur:.1f}{self._unit}'
+        p.drawText(w - pad_r - 80, 8, 80, 15, Qt.AlignRight | Qt.AlignVCenter, cur_text)
 
 
 class FanCurveWidget(QWidget):
