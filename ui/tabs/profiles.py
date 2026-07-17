@@ -183,6 +183,10 @@ class ProfilesTab(QWidget):
         self.btn_save_current.clicked.connect(self._on_save_current_clicked)
         cr_layout.addWidget(self.btn_save_current)
         
+        self.btn_update_existing = QPushButton("💾 Save Live Settings to Selected Profile")
+        self.btn_update_existing.clicked.connect(self._on_update_existing_clicked)
+        cr_layout.addWidget(self.btn_update_existing)
+        
         right_panel.addWidget(create_group)
         
         # Delete Selected Custom Profile
@@ -219,17 +223,18 @@ class ProfilesTab(QWidget):
         self.profile_dropdown.clear()
         
         profiles = self.config.get('profiles', {})
-        active = self.config.get('active_profile', 'Balanced (Recommended)')
+        active = self.config.get('active_profile', '')
         
         # Add all profiles
         self.profile_dropdown.addItems(sorted(profiles.keys()))
         
-        # Select active in dropdown, or fall back to first one
-        idx = self.profile_dropdown.findText(active)
-        if idx >= 0:
-            self.profile_dropdown.setCurrentIndex(idx)
-        else:
-            self.profile_dropdown.setCurrentIndex(0)
+        # Select active in dropdown, or fall back to first one if items exist
+        if self.profile_dropdown.count() > 0:
+            idx = self.profile_dropdown.findText(active)
+            if idx >= 0:
+                self.profile_dropdown.setCurrentIndex(idx)
+            else:
+                self.profile_dropdown.setCurrentIndex(0)
             
         self.profile_dropdown.blockSignals(False)
         
@@ -274,10 +279,11 @@ class ProfilesTab(QWidget):
         else:
             self.lbl_val_ratios.setText("—")
             
-        # 3. Handle Delete Button Enablement (only enable if it is a CUSTOM profile, i.e. not default)
-        default_names = ['Silent / Save Battery', 'Balanced (Recommended)', 'Gaming / Performance']
+        # 3. Handle Delete and Overwrite Button Enablement
+        default_names = []
         is_custom = selected_name not in default_names
         self.btn_delete.setEnabled(is_custom)
+        self.btn_update_existing.setEnabled(is_custom)
 
     def _clear_preview(self):
         for lbl in self.preview_uv_labels.values():
@@ -306,7 +312,7 @@ class ProfilesTab(QWidget):
             set_status(self.status, "Please enter a profile name first.", "err")
             return
             
-        default_names = ['Silent / Save Battery', 'Balanced (Recommended)', 'Gaming / Performance']
+        default_names = []
         if name in default_names:
             set_status(self.status, "Cannot overwrite default system profiles.", "err")
             return
@@ -350,12 +356,63 @@ class ProfilesTab(QWidget):
             
         set_status(self.status, f"Current settings saved as profile '{name}'.", "ok")
 
+    def _on_update_existing_clicked(self):
+        name = self.profile_dropdown.currentText()
+        if not name:
+            set_status(self.status, "Select an existing profile first.", "err")
+            return
+            
+        reply = QMessageBox.question(
+            self, 'Update Profile',
+            f"Are you sure you want to overwrite profile '{name}' with your current live settings?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+            
+        # Capture a snapshot of current active settings from the config
+        uv_cfg = self.config.get('undervolt', {})
+        power_cfg = self.config.get('power', {})
+        
+        snapshot = {
+            'undervolt': {
+                'core': uv_cfg.get('core', 0.0),
+                'cache': uv_cfg.get('cache', 0.0),
+                'gpu': uv_cfg.get('gpu', 0.0),
+                'uncore': uv_cfg.get('uncore', 0.0),
+                'analogio': uv_cfg.get('analogio', 0.0)
+            },
+            'power': {
+                'long': power_cfg.get('long', 15),
+                'short': power_cfg.get('short', 25),
+                'profile': power_cfg.get('profile', 'balanced'),
+                'ratios': list(power_cfg.get('ratios', [30, 30, 30, 30]))
+            }
+        }
+        
+        # Save to config under profiles list
+        self.config.setdefault('profiles', {})[name] = snapshot
+        
+        # Save config file (triggers debounce timer)
+        self.save_cb()
+        
+        # Refresh and select profile
+        self.refresh_profile_list()
+        
+        # Select the updated profile in the dropdown
+        idx = self.profile_dropdown.findText(name)
+        if idx >= 0:
+            self.profile_dropdown.setCurrentIndex(idx)
+            
+        set_status(self.status, f"Profile '{name}' updated with live settings.", "ok")
+
     def _on_delete_clicked(self):
         name = self.profile_dropdown.currentText()
         if not name:
             return
             
-        default_names = ['Silent / Save Battery', 'Balanced (Recommended)', 'Gaming / Performance']
+        default_names = []
         if name in default_names:
             set_status(self.status, "Cannot delete system default profiles.", "err")
             return
@@ -373,9 +430,9 @@ class ProfilesTab(QWidget):
         if 'profiles' in self.config and name in self.config['profiles']:
             del self.config['profiles'][name]
             
-        # If the deleted profile was active, set active to Balanced (Recommended)
+        # If the deleted profile was active, set active to empty
         if self.config.get('active_profile') == name:
-            self.config['active_profile'] = 'Balanced (Recommended)'
+            self.config['active_profile'] = ''
             
         # Save and refresh dropdown list
         self.save_cb()

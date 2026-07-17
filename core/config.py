@@ -31,39 +31,8 @@ DEFAULT_CONFIG = {
         'long': 15, 'short': 25, 'profile': 'balanced', 
         'ratios': [0, 0, 0, 0], 'apply_on_boot': False
     },
-    'profiles': {
-        'Silent / Save Battery': {
-            'undervolt': {
-                'core': -50.0, 'cache': -50.0, 'gpu': 0.0,
-                'uncore': 0.0, 'analogio': 0.0
-            },
-            'power': {
-                'long': 10, 'short': 15, 'profile': 'battery',
-                'ratios': [25, 25, 25, 25]
-            }
-        },
-        'Balanced (Recommended)': {
-            'undervolt': {
-                'core': -70.0, 'cache': -70.0, 'gpu': 0.0,
-                'uncore': 0.0, 'analogio': 0.0
-            },
-            'power': {
-                'long': 15, 'short': 25, 'profile': 'balanced',
-                'ratios': [30, 30, 30, 30]
-            }
-        },
-        'Gaming / Performance': {
-            'undervolt': {
-                'core': -80.0, 'cache': -80.0, 'gpu': 0.0,
-                'uncore': 0.0, 'analogio': 0.0
-            },
-            'power': {
-                'long': 25, 'short': 35, 'profile': 'performance',
-                'ratios': [41, 40, 39, 38]
-            }
-        }
-    },
-    'active_profile': 'Balanced (Recommended)',
+    'profiles': {},
+    'active_profile': "",
 }
 
 def load_config() -> dict:

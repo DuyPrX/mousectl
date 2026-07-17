@@ -380,7 +380,7 @@ class MouseCtl(QMainWindow):
         group = QActionGroup(self)
         
         profiles = self._cfg.get('profiles', {})
-        active = self._cfg.get('active_profile', 'Balanced (Recommended)')
+        active = self._cfg.get('active_profile', '')
         
         for p in sorted(profiles.keys()):
             act = QAction(p, self)
@@ -471,7 +471,7 @@ class MouseCtl(QMainWindow):
         self.tray_disk.setText(f"💽 Disk: 📖 {format_speed(disk_r)} | ✍ {format_speed(disk_w)}")
         
         # Sync Active Profile Check in Tray
-        active_prof = self._cfg.get('active_profile', 'Balanced (Recommended)')
+        active_prof = self._cfg.get('active_profile', '')
         for p_name, act in self.prof_actions.items():
             act.blockSignals(True)
             act.setChecked(p_name == active_prof)
