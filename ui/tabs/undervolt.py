@@ -95,8 +95,9 @@ class UndervoltTab(QWidget):
         btn_apply.setObjectName('primary')
         btn_reset = QPushButton('RESET')
         
-        self.boot_check = QCheckBox('Apply on boot')
+        self.boot_check = QCheckBox('Apply on App Start')
         self.boot_check.setChecked(config.get('undervolt', {}).get('apply_on_boot', False))
+        self.boot_check.setToolTip('Automatically apply saved undervolt settings when the mousectl app is launched, rather than at system boot. This protects your system from boot loops if settings are unstable.')
         
         self.boot_check_link = QCheckBox('Link Core/Cache')
         self.boot_check_link.setChecked(True)

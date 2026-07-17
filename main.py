@@ -170,6 +170,26 @@ class MouseCtl(QMainWindow):
         self._save_timer.setInterval(600)
         self._save_timer.timeout.connect(self._do_save_cfg)
 
+        # Apply config locally on app startup (if not in remote/windows mode)
+        self.apply_config_on_startup()
+
+    def apply_config_on_startup(self):
+        if os.name == 'nt':
+            return
+        if self._cfg.get('undervolt', {}).get('apply_on_boot'):
+            import core.undervolt as uv
+            planes = ['core', 'cache', 'gpu', 'uncore', 'analogio']
+            for plane in planes:
+                val = self._cfg.get('undervolt', {}).get(plane, 0.0)
+                if val != 0.0:
+                    try:
+                        if uv.set_undervolt(plane, val):
+                            print(f"[Startup] Applied undervolt to {plane}: {val}mV")
+                        else:
+                            print(f"[Startup] Failed to apply undervolt to {plane}: {val}mV")
+                    except Exception as e:
+                        print(f"[Startup] Exception applying undervolt to {plane}: {e}")
+
     def _setup_ui(self):
         # Header
         header = QWidget()

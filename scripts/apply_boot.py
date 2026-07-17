@@ -15,15 +15,8 @@ def main():
     print("--- mousectl boot apply ---")
     cfg = load_config()
     
-    # 1. Undervolt
-    if cfg['undervolt'].get('apply_on_boot'):
-        planes = ['core', 'cache', 'gpu', 'uncore', 'analogio']
-        for plane in planes:
-            val = cfg['undervolt'].get(plane, 0.0)
-            if set_undervolt(plane, val):
-                print(f"[OK] {plane} undervolt: {val}mV")
-            else:
-                print(f"[FAIL] {plane} undervolt: {val}mV")
+    # 1. Undervolt (Disabled on boot for safety; applied on app start instead to prevent boot loops)
+    # The undervolt offset will be applied when the mousectl app is launched.
 
     # 2. Power & TDP
     if cfg['power'].get('apply_on_boot'):
