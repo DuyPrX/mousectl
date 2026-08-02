@@ -17,6 +17,7 @@ from ui.tabs.profiles import ProfilesTab
 from ui.tabs.power import PowerTab
 from ui.tabs.undervolt import UndervoltTab
 from ui.tabs.fan import FanTab
+from ui.tabs.cables import CablesTab
 
 from core.msr import _load_msr
 
@@ -134,6 +135,28 @@ if os.name == 'nt':
             
     undervolt.read_undervolt = remote_read_undervolt
 
+    import core.cables as cables
+
+    def remote_read_cables():
+        try:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            res = subprocess.run(
+                ["ssh", "dnxk@100.115.117.31", "python3 /opt/mousectl/main.py --cables-json"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                startupinfo=startupinfo,
+                timeout=5
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                return json.loads(res.stdout)
+        except Exception as e:
+            print(f"[REMOTE] Failed to read cables telemetry: {e}")
+        return {"summary": "N/A (Remote Error)", "power": {}, "typec": [], "devices": []}
+            
+    cables.get_cables_report = remote_read_cables
+
 class MouseCtl(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -217,9 +240,11 @@ class MouseCtl(QMainWindow):
         self.tabs.setDocumentMode(True)
         
         self.tab_dash = DashboardTab(self._cfg)
+        self.tab_cables = CablesTab(self._cfg)
         self.tab_profiles = ProfilesTab(self._cfg, self._save_cfg, self.apply_custom_profile)
         
         self.tabs.addTab(self.tab_dash, " DASHBOARD ")
+        self.tabs.addTab(self.tab_cables, " CABLES & USB ")
         self.tabs.addTab(self.tab_profiles, " PROFILES ")
 
         if os.name != 'nt':
@@ -486,6 +511,12 @@ class MouseCtl(QMainWindow):
             event.accept()
 
 def main():
+    if "--cables-json" in sys.argv:
+        import json
+        from core.cables import get_cables_report
+        print(json.dumps(get_cables_report()))
+        sys.exit(0)
+
     if "--telemetry-json" in sys.argv:
         import json
         import time

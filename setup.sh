@@ -37,9 +37,9 @@ DMI_PRODUCT=$(cat /sys/class/dmi/id/product_name 2>/dev/null || echo "unknown")
 info "Kernel:   $KERNEL"
 info "Hardware: $DMI_PRODUCT"
 
-CORE_FILES=("config.py" "msr.py" "sysfs.py" "telemetry.py" "undervolt.py")
+CORE_FILES=("config.py" "msr.py" "sysfs.py" "telemetry.py" "undervolt.py" "cables.py")
 UI_FILES=("style.py" "widgets.py")
-TAB_FILES=("dashboard.py" "profiles.py" "power.py" "undervolt.py" "fan.py")
+TAB_FILES=("dashboard.py" "profiles.py" "power.py" "undervolt.py" "fan.py" "cables.py")
 SCRIPT_FILES=("apply_boot.py" "fan_daemon.py")
 
 for f in main.py "${CORE_FILES[@]/#/core/}" "${UI_FILES[@]/#/ui/}" "${TAB_FILES[@]/#/ui/tabs/}" "${SCRIPT_FILES[@]/#/scripts/}" "patch-system76-dkms.sh"; do
