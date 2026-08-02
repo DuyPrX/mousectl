@@ -239,7 +239,7 @@ def get_cables_report() -> dict:
         summary_parts.append(
             f"⚡ Direct Type-C / AC Power Active (Pass-Through Mode). "
             f"Battery charging paused at {power['battery_capacity']}% (0.00A). "
-            f"Type-C Port Direct Input Draw: ~{power['direct_typec_power_w']} W (CPU: {power['cpu_power_w']} W + System: ~4.0 W)."
+            f"Estimated Type-C Input Draw: ~{power['direct_typec_power_w']} W (Derived: RAPL CPU {power['cpu_power_w']} W + System ~4.0 W; no direct Type-C hardware ADC sensor on this platform)."
         )
     elif power["ac_online"]:
         summary_parts.append(

@@ -28,11 +28,11 @@ class CablesTab(QWidget):
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(8)
         
-        self.card_ac       = StatCard('POWER MODE',         'Mode',   T['accent'])
-        self.card_typec_w  = StatCard('TYPE-C INPUT POWER', 'W',      T['warn'])
-        self.card_cpu_w    = StatCard('CPU PACKAGE POWER',  'W',      T['accent2'])
-        self.card_bat      = StatCard('BATTERY LEVEL',      '%',      T['green'])
-        self.card_health   = StatCard('BAT HEALTH',         '%',      T['muted2'])
+        self.card_ac       = StatCard('POWER MODE',         'Mode',           T['accent'])
+        self.card_typec_w  = StatCard('EST. TYPE-C DRAW',   'W (Calculated)', T['warn'])
+        self.card_cpu_w    = StatCard('CPU PACKAGE POWER',  'W (RAPL)',       T['accent2'])
+        self.card_bat      = StatCard('BATTERY LEVEL',      '%',              T['green'])
+        self.card_health   = StatCard('BAT HEALTH',         '%',              T['muted2'])
         
         for c in [self.card_ac, self.card_typec_w, self.card_cpu_w, self.card_bat, self.card_health]:
             c.setMinimumHeight(80)
