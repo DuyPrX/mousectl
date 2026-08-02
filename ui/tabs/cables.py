@@ -97,6 +97,7 @@ class CablesTab(QWidget):
                 mode_str = "Battery"
 
             self.card_ac.set_value(mode_str)
+            self.card_typec_w.set_unit(p.get('sensor_label', 'W (Calculated)'))
             self.card_typec_w.set_value(f"~{p['direct_typec_power_w']}")
             self.card_cpu_w.set_value(f"{p['cpu_power_w']}")
             self.card_bat.set_value(f"{p['battery_capacity']}% ({p['battery_status']})")

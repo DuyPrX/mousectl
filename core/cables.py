@@ -180,17 +180,55 @@ def get_power_supply_info() -> dict:
             if c_design > 0:
                 res["battery_health_pct"] = round((c_full / c_design) * 100.0, 1)
 
-    # Detect Pass-Through Power Mode & Direct Type-C Power Input Draw
-    if res["ac_online"]:
-        st = res["battery_status"].lower()
-        if st in ("not charging", "idle", "full") or res["battery_current_a"] == 0:
-            res["is_passthrough"] = True
-            # In direct pass-through mode, battery input is 0. Total Type-C draw = CPU Package W + System Overhead (~4.0W)
-            res["direct_typec_power_w"] = round(res["cpu_power_w"] + 4.0, 1)
-        else:
-            # When charging, total Type-C draw = Charging Power + CPU Package W + System Overhead (~4.0W)
-            res["is_passthrough"] = False
-            res["direct_typec_power_w"] = round(res["cpu_power_w"] + res["battery_power_w"] + 4.0, 1)
+    # 1. Check for Direct Hardware Sensor Nodes (UCSI, USB PD controller, hwmon charger sensors)
+    direct_hw_power = None
+    hardware_sensor_name = ""
+
+    for ps in glob.glob(os.path.join(base_path, "*")):
+        ps_name = os.path.basename(ps).lower()
+        if any(k in ps_name for k in ("ucsi", "usb_pd", "usb-pd", "charger", "typec")):
+            v_path = os.path.join(ps, "voltage_now")
+            i_path = os.path.join(ps, "current_now")
+            p_path = os.path.join(ps, "power_now")
+            
+            if os.path.isfile(p_path):
+                try:
+                    p_uw = float(Path(p_path).read_text().strip())
+                    if p_uw > 0:
+                        direct_hw_power = round(p_uw / 1e6, 1)
+                        hardware_sensor_name = os.path.basename(ps)
+                        break
+                except Exception:
+                    pass
+            elif os.path.isfile(v_path) and os.path.isfile(i_path):
+                try:
+                    v_uv = float(Path(v_path).read_text().strip())
+                    i_ua = float(Path(i_path).read_text().strip())
+                    if v_uv > 0 and i_ua > 0:
+                        direct_hw_power = round((v_uv / 1e6) * (i_ua / 1e6), 1)
+                        hardware_sensor_name = os.path.basename(ps)
+                        break
+                except Exception:
+                    pass
+
+    # 2. Assign values: Direct Hardware Sensor vs RAPL Fallback Calculation
+    if direct_hw_power is not None:
+        res["direct_typec_power_w"] = direct_hw_power
+        res["power_sensor_type"] = "Direct Hardware ADC Sensor"
+        res["sensor_label"] = f"W (Hardware: {hardware_sensor_name})"
+        res["is_passthrough"] = res["ac_online"] and (res["battery_status"].lower() in ("not charging", "idle", "full") or res["battery_current_a"] == 0)
+    else:
+        res["power_sensor_type"] = "RAPL Calculated"
+        res["sensor_label"] = "W (Calculated)"
+        if res["ac_online"]:
+            st = res["battery_status"].lower()
+            if st in ("not charging", "idle", "full") or res["battery_current_a"] == 0:
+                res["is_passthrough"] = True
+                # In direct pass-through mode, battery input is 0. Total Type-C draw = CPU Package W + System Overhead (~4.0W)
+                res["direct_typec_power_w"] = round(res["cpu_power_w"] + 4.0, 1)
+            else:
+                res["is_passthrough"] = False
+                res["direct_typec_power_w"] = round(res["cpu_power_w"] + res["battery_power_w"] + 4.0, 1)
 
     return res
 
