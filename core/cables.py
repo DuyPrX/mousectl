@@ -107,7 +107,7 @@ def get_usb_devices() -> list:
     return devices
 
 def get_power_supply_info() -> dict:
-    """Scans /sys/class/power_supply/ for AC charger and battery data."""
+    """Scans /sys/class/power_supply/ for AC charger and battery data, calculating direct Type-C power draw."""
     res = {
         "ac_online": False,
         "ac_type": "Disconnected",
@@ -116,12 +116,23 @@ def get_power_supply_info() -> dict:
         "battery_health_pct": 100.0,
         "battery_voltage_v": 0.0,
         "battery_current_a": 0.0,
+        "battery_power_w": 0.0,
         "charge_now_mah": 0,
         "charge_full_mah": 0,
         "charge_design_mah": 0,
         "manufacturer": "",
-        "model": ""
+        "model": "",
+        "cpu_power_w": 0.0,
+        "direct_typec_power_w": 0.0,
+        "is_passthrough": False
     }
+
+    # Fetch CPU Package Power from RAPL (via sysfs)
+    try:
+        import core.sysfs as sysfs
+        res["cpu_power_w"] = round(sysfs.get_cpu_power(), 1)
+    except Exception:
+        pass
 
     base_path = "/sys/class/power_supply"
     if not os.path.exists(base_path):
@@ -155,6 +166,7 @@ def get_power_supply_info() -> dict:
             i_now = float(read_val("current_now", "0") or 0) / 1e6
             res["battery_voltage_v"] = round(v_now, 2)
             res["battery_current_a"] = round(i_now, 2)
+            res["battery_power_w"] = round(v_now * i_now, 2)
 
             # Charges
             c_now = float(read_val("charge_now", "0") or 0) / 1000.0
@@ -167,6 +179,18 @@ def get_power_supply_info() -> dict:
 
             if c_design > 0:
                 res["battery_health_pct"] = round((c_full / c_design) * 100.0, 1)
+
+    # Detect Pass-Through Power Mode & Direct Type-C Power Input Draw
+    if res["ac_online"]:
+        st = res["battery_status"].lower()
+        if st in ("not charging", "idle", "full") or res["battery_current_a"] == 0:
+            res["is_passthrough"] = True
+            # In direct pass-through mode, battery input is 0. Total Type-C draw = CPU Package W + System Overhead (~4.0W)
+            res["direct_typec_power_w"] = round(res["cpu_power_w"] + 4.0, 1)
+        else:
+            # When charging, total Type-C draw = Charging Power + CPU Package W + System Overhead (~4.0W)
+            res["is_passthrough"] = False
+            res["direct_typec_power_w"] = round(res["cpu_power_w"] + res["battery_power_w"] + 4.0, 1)
 
     return res
 
@@ -211,11 +235,21 @@ def get_cables_report() -> dict:
 
     # Generate plain-English summary (WhatCable style!)
     summary_parts = []
-    if power["ac_online"]:
-        ac_t = power["ac_type"]
-        summary_parts.append(f"🔌 Connected to {ac_t} Power. Status: {power['battery_status']}.")
+    if power["is_passthrough"]:
+        summary_parts.append(
+            f"⚡ Direct Type-C / AC Power Active (Pass-Through Mode). "
+            f"Battery charging paused at {power['battery_capacity']}% (0.00A). "
+            f"Type-C Port Direct Input Draw: ~{power['direct_typec_power_w']} W (CPU: {power['cpu_power_w']} W + System: ~4.0 W)."
+        )
+    elif power["ac_online"]:
+        summary_parts.append(
+            f"🔌 Charging via {power['ac_type']} ({power['battery_power_w']} W into battery). "
+            f"Total Type-C Input Draw: ~{power['direct_typec_power_w']} W."
+        )
     else:
-        summary_parts.append(f"🔋 Running on Battery ({power['battery_capacity']}% capacity remaining).")
+        summary_parts.append(
+            f"🔋 Running on Battery ({power['battery_capacity']}%, {power['battery_power_w']} W discharge)."
+        )
 
     if typec:
         p0 = typec[0]

@@ -28,12 +28,13 @@ class CablesTab(QWidget):
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(8)
         
-        self.card_ac      = StatCard('CHARGER / AC',  'Type',  T['accent'])
-        self.card_bat     = StatCard('BATTERY LEVEL', '%',     T['green'])
-        self.card_health  = StatCard('BAT HEALTH',    '%',     T['accent2'])
-        self.card_voltage = StatCard('VOLTAGE / AMPS', 'V / A', T['warn'])
+        self.card_ac       = StatCard('POWER MODE',         'Mode',   T['accent'])
+        self.card_typec_w  = StatCard('TYPE-C INPUT POWER', 'W',      T['warn'])
+        self.card_cpu_w    = StatCard('CPU PACKAGE POWER',  'W',      T['accent2'])
+        self.card_bat      = StatCard('BATTERY LEVEL',      '%',      T['green'])
+        self.card_health   = StatCard('BAT HEALTH',         '%',      T['muted2'])
         
-        for c in [self.card_ac, self.card_bat, self.card_health, self.card_voltage]:
+        for c in [self.card_ac, self.card_typec_w, self.card_cpu_w, self.card_bat, self.card_health]:
             c.setMinimumHeight(80)
             cards_layout.addWidget(c)
         main_layout.addLayout(cards_layout)
@@ -88,11 +89,18 @@ class CablesTab(QWidget):
 
             # Update Power Cards
             p = report['power']
-            ac_str = f"{p['ac_type']}" if p['ac_online'] else "Disconnected"
-            self.card_ac.set_value(ac_str)
+            if p['is_passthrough']:
+                mode_str = "Type-C Pass-Through"
+            elif p['ac_online']:
+                mode_str = f"AC {p['ac_type']}"
+            else:
+                mode_str = "Battery"
+
+            self.card_ac.set_value(mode_str)
+            self.card_typec_w.set_value(f"~{p['direct_typec_power_w']}")
+            self.card_cpu_w.set_value(f"{p['cpu_power_w']}")
             self.card_bat.set_value(f"{p['battery_capacity']}% ({p['battery_status']})")
             self.card_health.set_value(f"{p['battery_health_pct']}%")
-            self.card_voltage.set_value(f"{p['battery_voltage_v']}V / {p['battery_current_a']}A")
 
             # Update USB Table
             devs = report['devices']
