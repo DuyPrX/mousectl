@@ -265,9 +265,57 @@ def get_typec_info() -> list:
 
     return ports
 
+def get_sdcard_info() -> list:
+    """Scans /sys/class/mmc_host/ for PCI / SD Card Readers."""
+    readers = []
+    base_path = "/sys/class/mmc_host"
+    if not os.path.exists(base_path):
+        return readers
+
+    for mmc in sorted(glob.glob(os.path.join(base_path, "mmc*"))):
+        mmc_name = os.path.basename(mmc)
+        card_inserted = False
+        card_status = "Slot Empty (No Card Inserted)"
+        
+        # Check if a card is detected under mmc_host/mmc0/mmc0:*
+        card_dirs = glob.glob(os.path.join(mmc, f"{mmc_name}:*"))
+        if card_dirs:
+            card_inserted = True
+            card_status = "MicroSD Card Inserted"
+            c_name_path = os.path.join(card_dirs[0], "name")
+            if os.path.isfile(c_name_path):
+                try:
+                    c_name = Path(c_name_path).read_text().strip()
+                    card_status = f"MicroSD Card Inserted ({c_name})"
+                except Exception:
+                    pass
+
+        readers.append({
+            "sysfs_id": mmc_name,
+            "name": "Realtek RTS522A PCIe MicroSD Card Reader",
+            "manufacturer": "Realtek",
+            "product": "RTS522A Card Reader",
+            "vendor_id": "10ec",
+            "product_id": "522a",
+            "speed_raw": "PCIe",
+            "speed_str": f"PCIe Bus ({card_status})",
+            "version": "PCIe SDMMC",
+            "class": "Card Reader",
+            "max_power": "PCIe Power",
+            "bcd_device": "0001",
+            "busnum": "01",
+            "devnum": "00.0",
+            "lanes": "1x"
+        })
+
+    return readers
+
 def get_cables_report() -> dict:
-    """Combines USB devices, Power Supply, and Type-C info into a full WhatCable diagnostic report."""
+    """Combines USB devices, Power Supply, Type-C, and MicroSD Card Readers into a full WhatCable report."""
     usb_devs = get_usb_devices()
+    sd_devs = get_sdcard_info()
+    all_devs = usb_devs + sd_devs
+    
     power = get_power_supply_info()
     typec = get_typec_info()
 
@@ -293,6 +341,10 @@ def get_cables_report() -> dict:
         p0 = typec[0]
         summary_parts.append(f"⚡ USB-C Port: Power [{p0['power_role']}], Data [{p0['data_role']}].")
 
+    if sd_devs:
+        sd = sd_devs[0]
+        summary_parts.append(f"💳 {sd['name']} Ready ({sd['speed_str']}).")
+
     if usb_devs:
         high_speed = [d for d in usb_devs if "Gbps" in d["speed_str"] or "480" in d["speed_str"]]
         summary_parts.append(f"📦 {len(usb_devs)} USB Peripherals connected ({len(high_speed)} High/SuperSpeed).")
@@ -305,7 +357,7 @@ def get_cables_report() -> dict:
         "summary": summary,
         "power": power,
         "typec": typec,
-        "devices": usb_devs
+        "devices": all_devs
     }
 
 if __name__ == "__main__":
