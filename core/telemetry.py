@@ -324,7 +324,7 @@ class PowerSampler(QThread):
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                     res = subprocess.run(
-                        ["ssh", "dnxk@100.115.117.31", "/usr/local/bin/mousectl --telemetry-json"],
+                        ["ssh", "dnxk@pop-noob", "/usr/local/bin/mousectl --telemetry-json"],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,

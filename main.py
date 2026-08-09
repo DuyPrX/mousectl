@@ -34,7 +34,7 @@ if os.name == 'nt':
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             res = subprocess.run(
-                ["ssh", "dnxk@100.115.117.31", cmd],
+                ["ssh", "dnxk@pop-noob", cmd],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -51,7 +51,7 @@ if os.name == 'nt':
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             subprocess.run(
-                ["ssh", "dnxk@100.115.117.31", f"echo 'dnxkipip' | sudo -S {cmd}"],
+                ["ssh", "dnxk@pop-noob", f"echo 'dnxkipip' | sudo -S {cmd}"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 startupinfo=startupinfo,
@@ -86,7 +86,7 @@ if os.name == 'nt':
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             p = subprocess.Popen(
-                ["ssh", "dnxk@100.115.117.31", "mkdir -p ~/.config/mousectl/ && cat > ~/.config/mousectl/config.json"],
+                ["ssh", "dnxk@pop-noob", "mkdir -p ~/.config/mousectl/ && cat > ~/.config/mousectl/config.json"],
                 stdin=subprocess.PIPE,
                 text=True,
                 startupinfo=startupinfo
@@ -120,7 +120,7 @@ if os.name == 'nt':
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             res = subprocess.run(
-                ["ssh", "dnxk@100.115.117.31", "python3 -c \"import sys; sys.path.append('/opt/mousectl'); from core.undervolt import read_undervolt; import json; print(json.dumps(read_undervolt()))\""],
+                ["ssh", "dnxk@pop-noob", "python3 -c \"import sys; sys.path.append('/opt/mousectl'); from core.undervolt import read_undervolt; import json; print(json.dumps(read_undervolt()))\""],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -142,7 +142,7 @@ if os.name == 'nt':
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             res = subprocess.run(
-                ["ssh", "dnxk@100.115.117.31", "python3 /opt/mousectl/main.py --cables-json"],
+                ["ssh", "dnxk@pop-noob", "python3 /opt/mousectl/main.py --cables-json"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
