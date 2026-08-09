@@ -240,11 +240,9 @@ class MouseCtl(QMainWindow):
         self.tabs.setDocumentMode(True)
         
         self.tab_dash = DashboardTab(self._cfg)
-        self.tab_cables = CablesTab(self._cfg)
         self.tab_profiles = ProfilesTab(self._cfg, self._save_cfg, self.apply_custom_profile)
         
         self.tabs.addTab(self.tab_dash, " DASHBOARD ")
-        self.tabs.addTab(self.tab_cables, " CABLES & USB ")
         self.tabs.addTab(self.tab_profiles, " PROFILES ")
 
         if os.name != 'nt':
